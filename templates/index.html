@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚽ Tu és o VAR!</title>
+<style>
+:root {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface2: #1c2129;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --cyan: #79c0ff;
+  --magenta: #d2a8ff;
+  --red: #f85149;
+  --green: #3fb950;
+  --yellow: #e3b341;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  user-select: none;
+}
+
+/* ── Header ── */
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+header h1 {
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+header h1 span { font-size: 18px; }
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+select, .btn {
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+select:hover, .btn:hover { background: var(--border); }
+.btn-primary { background: #1f6feb; border-color: #58a6ff; }
+.btn-primary:hover { background: #388bfd; }
+.btn-danger { border-color: var(--red); color: var(--red); }
+.btn-danger:hover { background: rgba(248,81,73,.15); }
+.upload-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background .15s;
+}
+.upload-label:hover { background: var(--border); }
+#fileInput { display: none; }
+#urlInput {
+  width: 220px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+}
+#urlInput::placeholder { color: var(--muted); }
+#urlInput:focus { outline: none; border-color: var(--accent); }
+.btn-download {
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  background: rgba(88,166,255,.1);
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.btn-download:hover { background: rgba(88,166,255,.2); }
+.btn-download:disabled { opacity:.4; cursor:wait; }
+.dl-status {
+  font-size: 11px;
+  color: var(--yellow);
+  display: none;
+  align-items: center;
+  gap: 4px;
+}
+.dl-status.show { display: inline-flex; }
+.spinner {
+  width: 12px; height: 12px;
+  border: 2px solid var(--border);
+  border-top: 2px solid var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Main layout ── */
+main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── Canvas area ── */
+.canvas-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background: #000;
+  min-width: 0;
+}
+#canvasWrap {
+  position: relative;
+  max-width: 100%;
+  max-height: 100%;
+}
+#frameCanvas, #overlayCanvas {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100vh - 110px);
+  object-fit: contain;
+}
+#overlayCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  cursor: crosshair;
+}
+
+/* ── Sidebar ── */
+aside {
+  width: 260px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-left: 1px solid var(--border);
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+/* Mode buttons */
+.btn-group {
+  display: flex;
+  gap: 4px;
+}
+.btn-group .btn {
+  flex: 1;
+  text-align: center;
+  font-weight: 600;
+}
+.btn-group .btn.active-def {
+  background: rgba(121,192,255,.2);
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+.btn-group .btn.active-atk {
+  background: rgba(210,168,255,.2);
+  border-color: var(--magenta);
+  color: var(--magenta);
+}
+
+/* Body part rows */
+.bp-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .1s;
+}
+.bp-row:hover { background: var(--surface2); }
+.bp-row.active {
+  background: rgba(88,166,255,.12);
+  outline: 1px solid var(--accent);
+}
+.bp-row .bp-name {
+  flex: 1;
+  font-size: 13px;
+}
+.bp-row input[type=number] {
+  width: 56px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  font-size: 12px;
+  text-align: right;
+}
+.bp-row .bp-unit { font-size: 11px; color: var(--muted); }
+
+/* Status panel */
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 2px 0;
+}
+.status-row .label { color: var(--muted); }
+.status-row .val { font-weight: 600; }
+.val-ok { color: var(--green); }
+.val-no { color: var(--muted); }
+.val-off { color: var(--red); }
+.val-on { color: var(--green); }
+
+/* Verdict display */
+#verdictBox {
+  padding: 10px;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 700;
+  display: none;
+}
+#verdictBox.offside {
+  background: rgba(248,81,73,.15);
+  border: 1px solid var(--red);
+  color: var(--red);
+  display: block;
+}
+#verdictBox.onside {
+  background: rgba(63,185,80,.15);
+  border: 1px solid var(--green);
+  color: var(--green);
+  display: block;
+}
+
+/* Calibration guide */
+.calib-guide {
+  font-size: 12px;
+  color: var(--yellow);
+  padding: 6px 8px;
+  background: rgba(227,179,65,.08);
+  border-radius: 6px;
+  border: 1px solid rgba(227,179,65,.3);
+  display: none;
+}
+.calib-guide.show { display: block; }
+.calib-steps { margin-top: 4px; }
+.calib-step {
+  padding: 1px 0;
+  color: var(--muted);
+}
+.calib-step.done { color: var(--green); }
+.calib-step.current { color: var(--yellow); font-weight: 600; }
+
+/* ── Footer / Slider ── */
+footer {
+  padding: 8px 16px;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.frame-nav-btn {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.frame-nav-btn:hover { background: var(--border); color: var(--text); }
+#frameSlider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+}
+#frameSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  cursor: grab;
+}
+#frameSlider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+  cursor: grab;
+}
+.frame-info {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  min-width: 140px;
+  text-align: right;
+}
+
+/* Actions grid */
+.actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+.actions-grid .btn { font-size: 11px; padding: 6px 8px; }
+
+/* Keyboard hint */
+.kbd {
+  display: inline-block;
+  padding: 0 4px;
+  border-radius: 3px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  font-size: 10px;
+  font-family: monospace;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+/* Instructions */
+.instructions {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.instructions code { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────── -->
+<header>
+  <h1><span>⚽</span> Tu és o VAR!</h1>
+  <div class="header-controls">
+    <select id="videoSelect" title="Selecionar video">
+      <option value="">-- Selecionar video --</option>
+    </select>
+    <label class="upload-label" title="Carregar video">
+      📁 Upload
+      <input type="file" id="fileInput" accept="video/*">
+    </label>
+    <span style="color:var(--muted);font-size:11px">│</span>
+    <input type="text" id="urlInput" placeholder="🔗 URL do video (YouTube, etc.)"
+           title="Cola o link do video">
+    <button class="btn-download" id="btnDownload" onclick="downloadUrl()">⬇ Download</button>
+    <span class="dl-status" id="dlStatus"><div class="spinner"></div> A descarregar...</span>
+  </div>
+</header>
+
+<!-- ── Main ───────────────────────────────── -->
+<main>
+  <div class="canvas-area" id="dropZone">
+    <div id="canvasWrap">
+      <canvas id="frameCanvas" width="1280" height="720"></canvas>
+      <canvas id="overlayCanvas" width="1280" height="720"></canvas>
+    </div>
+  </div>
+
+  <aside>
+    <!-- Calibration -->
+    <div>
+      <div class="section-title">🎯 Calibração</div>
+      <button class="btn" id="btnCalib" onclick="doAction('calibrate')"
+              style="width:100%">Calibrar (C)</button>
+      <div class="calib-guide" id="calibGuide">
+        <div>Clica nas linhas do campo:</div>
+        <div class="calib-steps">
+          <div class="calib-step" id="cs0">1. Início linha de baliza</div>
+          <div class="calib-step" id="cs1">2. Fim linha de baliza</div>
+          <div class="calib-step" id="cs2">3. Início linha da área</div>
+          <div class="calib-step" id="cs3">4. Fim linha da área</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode -->
+    <div>
+      <div class="section-title">👤 Modo</div>
+      <div class="btn-group">
+        <button class="btn active-def" id="btnDef"
+                onclick="setMode('defender')">DEF <span class="kbd">2</span></button>
+        <button class="btn" id="btnAtk"
+                onclick="setMode('attacker')">ATK <span class="kbd">1</span></button>
+      </div>
+    </div>
+
+    <!-- Body Part -->
+    <div>
+      <div class="section-title">🦵 Parte do corpo</div>
+      <div class="bp-row active" data-part="head" onclick="setBodyPart('head')">
+        <span class="bp-name">Cabeça <span class="kbd">H</span></span>
+        <input type="number" id="h_head" value="1.75" step="0.05" min="0" max="3"
+               onclick="event.stopPropagation()" onchange="updateHeights()">
+        <span class="bp-unit">m</span>
+      </div>
+      <div class="bp-row" data-part="chest" onclick="setBodyPart('chest')">
+        <span class="bp-name">Peito <span class="kbd">P</span></span>
+        <input type="number" id="h_chest" value="1.30" step="0.05" min="0" max="3"
+               onclick="event.stopPropagation()" onchange="updateHeights()">
+        <span class="bp-unit">m</span>
+      </div>
+      <div class="bp-row" data-part="knee" onclick="setBodyPart('knee')">
+        <span class="bp-name">Joelho <span class="kbd">J</span></span>
+        <input type="number" id="h_knee" value="0.50" step="0.05" min="0" max="3"
+               onclick="event.stopPropagation()" onchange="updateHeights()">
+        <span class="bp-unit">m</span>
+      </div>
+      <div class="bp-row" data-part="foot" onclick="setBodyPart('foot')">
+        <span class="bp-name">Bota <span class="kbd">B</span></span>
+        <input type="number" id="h_foot" value="0.05" step="0.05" min="0" max="3"
+               onclick="event.stopPropagation()" onchange="updateHeights()">
+        <span class="bp-unit">m</span>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div>
+      <div class="section-title">⚡ Ações</div>
+      <div class="actions-grid">
+        <button class="btn btn-primary" onclick="doAction('verdict')">Veredito ␣</button>
+        <button class="btn btn-danger" onclick="doAction('reset')">Reset (R)</button>
+        <button class="btn" onclick="doAction('undo')">Desfazer (Esc)</button>
+        <button class="btn" onclick="doAction('export')">Exportar (E)</button>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div>
+      <div class="section-title">📊 Estado</div>
+      <div class="status-row">
+        <span class="label">Calibração</span>
+        <span class="val" id="stCalib">—</span>
+      </div>
+      <div class="status-row">
+        <span class="label">DEF</span>
+        <span class="val" id="stDef">—</span>
+      </div>
+      <div class="status-row">
+        <span class="label">ATK</span>
+        <span class="val" id="stAtk">—</span>
+      </div>
+      <div id="verdictBox"></div>
+    </div>
+
+    <!-- Instructions -->
+    <div class="instructions">
+      <b>Workflow:</b><br>
+      1. Carrega video → escolhe frame<br>
+      2. <code>C</code> calibra (baliza + área)<br>
+      3. <code>2</code> DEF → clica no defesa<br>
+      4. <code>1</code> ATK → clica no atacante<br>
+      5. <code>Espaço</code> veredito<br>
+      <b>Click dir</b> = ajustar chão &nbsp; <b>Esc</b> = desfazer
+    </div>
+  </aside>
+</main>
+
+<!-- ── Footer / Frame slider ──────────────── -->
+<footer>
+  <button class="frame-nav-btn" onclick="moveFrame(-25)" title="-1s (↑)">⏪</button>
+  <button class="frame-nav-btn" onclick="moveFrame(-1)" title="-1 (←)">◀</button>
+  <input type="range" id="frameSlider" min="0" max="0" value="0"
+         oninput="onSliderInput(this.value)"
+         onchange="onSliderChange(this.value)">
+  <button class="frame-nav-btn" onclick="moveFrame(1)" title="+1 (→)">▶</button>
+  <button class="frame-nav-btn" onclick="moveFrame(25)" title="+1s (↓)">⏩</button>
+  <div class="frame-info" id="frameInfo">Frame 0 / 0 (0.0s)</div>
+</footer>
+
+<script>
+// ── State ────────────────────────────────────
+let S = { loaded: false, n_frames: 0, current_frame: 0, fps: 25,
+          frame_w: 1280, frame_h: 720, calibrating: false,
+          calib_points: 0, calibrated: false,
+          mode: 'defender', body_part: 'head',
+          body_heights: {head:1.75,chest:1.30,knee:0.50,foot:0.05},
+          def_marked: false, atk_marked: false,
+          verdict: null, distance_cm: null };
+
+const frameCanvas = document.getElementById('frameCanvas');
+const fCtx = frameCanvas.getContext('2d');
+const overlay = document.getElementById('overlayCanvas');
+const oCtx = overlay.getContext('2d');
+const frameImg = new Image();
+let mouseX = -1, mouseY = -1;
+let sliderDebounce = null;
+
+// ── Init ─────────────────────────────────────
+window.addEventListener('load', async () => {
+  await loadVideoList();
+  refreshFrame();
+});
+
+async function loadVideoList() {
+  const resp = await fetch('/videos');
+  const videos = await resp.json();
+  const sel = document.getElementById('videoSelect');
+  sel.innerHTML = '<option value="">-- Selecionar video --</option>';
+  videos.forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    sel.appendChild(opt);
+  });
+}
+
+document.getElementById('videoSelect').addEventListener('change', async function() {
+  if (!this.value) return;
+  await loadVideo(this.value);
+});
+
+document.getElementById('fileInput').addEventListener('change', async function() {
+  if (!this.files[0]) return;
+  const fd = new FormData();
+  fd.append('file', this.files[0]);
+  const resp = await fetch('/load', { method: 'POST', body: fd });
+  const data = await resp.json();
+  if (data.error) { alert(data.error); return; }
+  updateState(data);
+  refreshFrame();
+  await loadVideoList();
+});
+
+async function loadVideo(name) {
+  const resp = await fetch('/load', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name})
+  });
+  const data = await resp.json();
+  if (data.error) { alert(data.error); return; }
+  updateState(data);
+  refreshFrame();
+}
+
+async function downloadUrl() {
+  const input = document.getElementById('urlInput');
+  const url = input.value.trim();
+  if (!url) { input.focus(); return; }
+
+  const btn = document.getElementById('btnDownload');
+  const status = document.getElementById('dlStatus');
+  btn.disabled = true;
+  status.classList.add('show');
+
+  try {
+    const resp = await fetch('/download_url', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({url})
+    });
+    const data = await resp.json();
+    if (data.error) {
+      alert('Erro: ' + data.error);
+      return;
+    }
+    updateState(data);
+    refreshFrame();
+    await loadVideoList();
+    if (data.filename) {
+      document.getElementById('videoSelect').value = data.filename;
+    }
+    input.value = '';
+  } catch (e) {
+    alert('Erro de rede: ' + e.message);
+  } finally {
+    btn.disabled = false;
+    status.classList.remove('show');
+  }
+}
+
+// Allow Enter key in URL input to trigger download
+document.getElementById('urlInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') { e.preventDefault(); downloadUrl(); }
+});
+
+// ── API helpers ──────────────────────────────
+async function doAction(action, extra={}) {
+  const resp = await fetch('/action', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({action, ...extra})
+  });
+  const data = await resp.json();
+  if (data.error) return;
+  updateState(data);
+  refreshFrame();
+}
+
+function refreshFrame() {
+  frameImg.src = '/frame?t=' + Date.now();
+}
+
+frameImg.onload = () => {
+  frameCanvas.width = frameImg.naturalWidth;
+  frameCanvas.height = frameImg.naturalHeight;
+  overlay.width = frameImg.naturalWidth;
+  overlay.height = frameImg.naturalHeight;
+  fCtx.drawImage(frameImg, 0, 0);
+  drawOverlay();
+};
+
+// ── State UI update ──────────────────────────
+function updateState(data) {
+  Object.assign(S, data);
+
+  // Slider
+  const slider = document.getElementById('frameSlider');
+  slider.max = Math.max(0, S.n_frames - 1);
+  slider.value = S.current_frame;
+  document.getElementById('frameInfo').textContent =
+    `Frame ${S.current_frame} / ${S.n_frames - 1} (${(S.current_frame / S.fps).toFixed(1)}s)`;
+
+  // Mode buttons
+  const bd = document.getElementById('btnDef');
+  const ba = document.getElementById('btnAtk');
+  bd.className = 'btn' + (S.mode === 'defender' ? ' active-def' : '');
+  ba.className = 'btn' + (S.mode === 'attacker' ? ' active-atk' : '');
+
+  // Body part
+  document.querySelectorAll('.bp-row').forEach(r => {
+    r.classList.toggle('active', r.dataset.part === S.body_part);
+  });
+  if (S.body_heights) {
+    for (const [k, v] of Object.entries(S.body_heights)) {
+      const el = document.getElementById('h_' + k);
+      if (el && document.activeElement !== el) el.value = v;
+    }
+  }
+
+  // Calibration guide
+  const guide = document.getElementById('calibGuide');
+  guide.classList.toggle('show', S.calibrating);
+  for (let i = 0; i < 4; i++) {
+    const el = document.getElementById('cs' + i);
+    el.className = 'calib-step';
+    if (i < S.calib_points) el.classList.add('done');
+    else if (i === S.calib_points) el.classList.add('current');
+  }
+
+  // Status
+  document.getElementById('stCalib').innerHTML =
+    S.calibrated ? '<span class="val-ok">✓ OK</span>'
+    : S.calibrating ? '<span style="color:var(--yellow)">...' + S.calib_points + '/4</span>'
+    : '<span class="val-no">—</span>';
+  document.getElementById('stDef').innerHTML =
+    S.def_marked ? '<span class="val-ok">✓ marcado</span>' : '<span class="val-no">—</span>';
+  document.getElementById('stAtk').innerHTML =
+    S.atk_marked ? '<span class="val-ok">✓ marcado</span>' : '<span class="val-no">—</span>';
+
+  // Verdict
+  const vb = document.getElementById('verdictBox');
+  if (S.verdict === 'OFFSIDE') {
+    const d = S.distance_cm != null ? ` — ${S.distance_cm} cm` : '';
+    vb.textContent = `FORA DE JOGO!${d}`;
+    vb.className = 'offside';
+  } else if (S.verdict === 'ONSIDE') {
+    const d = S.distance_cm != null ? ` — ${S.distance_cm} cm` : '';
+    vb.textContent = `EM JOGO${d}`;
+    vb.className = 'onside';
+  } else {
+    vb.textContent = '';
+    vb.className = '';
+  }
+}
+
+// ── Canvas interactions ──────────────────────
+function canvasCoords(e) {
+  const rect = overlay.getBoundingClientRect();
+  const sx = overlay.width / rect.width;
+  const sy = overlay.height / rect.height;
+  return {
+    cx: (e.clientX - rect.left) * sx,
+    cy: (e.clientY - rect.top) * sy
+  };
+}
+
+overlay.addEventListener('mousemove', e => {
+  const {cx, cy} = canvasCoords(e);
+  mouseX = cx;
+  mouseY = cy;
+  drawOverlay();
+});
+
+overlay.addEventListener('mouseleave', () => {
+  mouseX = -1; mouseY = -1;
+  drawOverlay();
+});
+
+overlay.addEventListener('click', e => {
+  if (!S.loaded) return;
+  const {cx, cy} = canvasCoords(e);
+  const ox = Math.round(cx / 2);
+  const oy = Math.round(cy / 2);
+  doAction('click', {x: ox, y: oy, button: 'left'});
+});
+
+overlay.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  if (!S.loaded) return;
+  const {cx, cy} = canvasCoords(e);
+  const ox = Math.round(cx / 2);
+  const oy = Math.round(cy / 2);
+  doAction('click', {x: ox, y: oy, button: 'right'});
+});
+
+// ── Magnifier ────────────────────────────────
+function drawOverlay() {
+  oCtx.clearRect(0, 0, overlay.width, overlay.height);
+  if (mouseX < 0 || mouseY < 0) return;
+
+  const zoom = 4;
+  const r = 65;
+  const srcR = r / zoom;
+
+  // Position offset from cursor
+  let mx = mouseX + 50;
+  let my = mouseY - 50;
+  mx = Math.max(r + 2, Math.min(overlay.width - r - 2, mx));
+  my = Math.max(r + 2, Math.min(overlay.height - r - 2, my));
+
+  oCtx.save();
+  oCtx.beginPath();
+  oCtx.arc(mx, my, r, 0, Math.PI * 2);
+  oCtx.clip();
+
+  // Dark background
+  oCtx.fillStyle = '#000';
+  oCtx.fillRect(mx - r, my - r, r * 2, r * 2);
+
+  // Zoomed content from frame canvas
+  const sx = Math.max(0, mouseX - srcR);
+  const sy = Math.max(0, mouseY - srcR);
+  const sw = Math.min(srcR * 2, overlay.width - sx);
+  const sh = Math.min(srcR * 2, overlay.height - sy);
+  if (sw > 0 && sh > 0) {
+    oCtx.imageSmoothingEnabled = false;
+    oCtx.drawImage(frameCanvas,
+      sx, sy, sw, sh,
+      mx - r, my - r, (sw / (srcR * 2)) * r * 2, (sh / (srcR * 2)) * r * 2);
+  }
+  oCtx.restore();
+
+  // Border
+  const col = S.calibrating ? '#e3b341'
+    : S.mode === 'attacker' ? '#d2a8ff' : '#79c0ff';
+  oCtx.strokeStyle = col;
+  oCtx.lineWidth = 2;
+  oCtx.beginPath();
+  oCtx.arc(mx, my, r, 0, Math.PI * 2);
+  oCtx.stroke();
+
+  // Crosshair
+  oCtx.strokeStyle = '#fff';
+  oCtx.lineWidth = 1;
+  oCtx.beginPath();
+  oCtx.moveTo(mx - 7, my); oCtx.lineTo(mx + 7, my);
+  oCtx.moveTo(mx, my - 7); oCtx.lineTo(mx, my + 7);
+  oCtx.stroke();
+}
+
+// ── Frame navigation ─────────────────────────
+function moveFrame(delta) {
+  if (!S.loaded) return;
+  const idx = Math.max(0, Math.min(S.n_frames - 1, S.current_frame + delta));
+  doAction('set_frame', {idx});
+}
+
+function onSliderInput(val) {
+  document.getElementById('frameInfo').textContent =
+    `Frame ${val} / ${S.n_frames - 1} (${(val / S.fps).toFixed(1)}s)`;
+  clearTimeout(sliderDebounce);
+  sliderDebounce = setTimeout(() => onSliderChange(val), 80);
+}
+
+function onSliderChange(val) {
+  clearTimeout(sliderDebounce);
+  doAction('set_frame', {idx: parseInt(val)});
+}
+
+// ── Mode / body part ─────────────────────────
+function setMode(mode) { doAction('set_mode', {mode}); }
+function setBodyPart(part) { doAction('set_body_part', {part}); }
+function updateHeights() {
+  const heights = {
+    head: parseFloat(document.getElementById('h_head').value) || 1.75,
+    chest: parseFloat(document.getElementById('h_chest').value) || 1.30,
+    knee: parseFloat(document.getElementById('h_knee').value) || 0.50,
+    foot: parseFloat(document.getElementById('h_foot').value) || 0.05,
+  };
+  doAction('set_heights', {heights});
+}
+
+// ── Keyboard shortcuts ───────────────────────
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (!S.loaded && !['u'].includes(e.key)) return;
+
+  switch (e.key) {
+    case '1': setMode('attacker'); break;
+    case '2': setMode('defender'); break;
+    case 'h': setBodyPart('head'); break;
+    case 'p': setBodyPart('chest'); break;
+    case 'j': setBodyPart('knee'); break;
+    case 'b': setBodyPart('foot'); break;
+    case ' ': e.preventDefault(); doAction('verdict'); break;
+    case 'r': doAction('reset'); break;
+    case 'c': doAction('calibrate'); break;
+    case 'ArrowRight': case 'd': e.preventDefault(); moveFrame(1); break;
+    case 'ArrowLeft':  case 'a': e.preventDefault(); moveFrame(-1); break;
+    case 'ArrowUp':    case 'w': e.preventDefault(); moveFrame(25); break;
+    case 'ArrowDown':  case 's': e.preventDefault(); moveFrame(-25); break;
+    case 'e': doAction('export'); break;
+    case 'Escape': doAction('undo'); break;
+  }
+});
+
+// ── Drag & drop ──────────────────────────────
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.style.outline = '2px dashed var(--accent)'; });
+dz.addEventListener('dragleave', () => { dz.style.outline = 'none'; });
+dz.addEventListener('drop', async e => {
+  e.preventDefault();
+  dz.style.outline = 'none';
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.type.startsWith('video/')) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  const resp = await fetch('/load', { method: 'POST', body: fd });
+  const data = await resp.json();
+  if (data.error) { alert(data.error); return; }
+  updateState(data);
+  refreshFrame();
+  await loadVideoList();
+});
+</script>
+</body>
+</html>
