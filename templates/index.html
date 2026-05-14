@@ -391,6 +391,10 @@ footer {
     <input type="text" id="urlInput" placeholder="🔗 URL do video (YouTube, etc.)"
            title="Cola o link do video">
     <button class="btn-download" id="btnDownload" onclick="downloadUrl()">⬇ Download</button>
+    <label class="upload-label" title="Upload cookies.txt para YouTube" style="font-size:11px;padding:4px 8px;">
+      🍪
+      <input type="file" id="cookiesInput" accept=".txt" onchange="uploadCookies(this)">
+    </label>
     <span class="dl-status" id="dlStatus"><div class="spinner"></div> A descarregar...</span>
   </div>
 </header>
@@ -585,6 +589,20 @@ async function downloadUrl() {
   const url = input.value.trim();
   if (!url) { input.focus(); return; }
 
+  // YouTube warning
+  if (/youtu\.?be/i.test(url)) {
+    const hasCookies = await fetch('/has_cookies').then(r => r.json());
+    if (!hasCookies.ok) {
+      alert('⚠️ Links do YouTube precisam de cookies para funcionar num servidor.\n\n' +
+            '1. Instala a extensão "Get cookies.txt LOCALLY" no Chrome\n' +
+            '2. Vai a youtube.com com login feito\n' +
+            '3. Exporta os cookies (clica na extensão → Export)\n' +
+            '4. Faz upload do cookies.txt clicando no 🍪 ao lado do botão Download\n\n' +
+            'Outros sites (TVI, RTP, etc.) funcionam sem cookies.');
+      return;
+    }
+  }
+
   const btn = document.getElementById('btnDownload');
   const status = document.getElementById('dlStatus');
   btn.disabled = true;
@@ -614,6 +632,24 @@ async function downloadUrl() {
     btn.disabled = false;
     status.classList.remove('show');
   }
+}
+
+async function uploadCookies(input) {
+  if (!input.files.length) return;
+  const form = new FormData();
+  form.append('file', input.files[0]);
+  try {
+    const resp = await fetch('/upload_cookies', {method:'POST', body: form});
+    const data = await resp.json();
+    if (data.ok) {
+      alert('✅ Cookies carregados! Links do YouTube devem funcionar agora.');
+    } else {
+      alert('Erro: ' + (data.error || 'falha'));
+    }
+  } catch (e) {
+    alert('Erro: ' + e.message);
+  }
+  input.value = '';
 }
 
 // Allow Enter key in URL input to trigger download

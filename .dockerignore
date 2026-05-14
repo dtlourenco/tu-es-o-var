@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+input_videos/
+output_videos/
+models/
+*.mp4
+*.avi
+*.mkv
+*.webm
+.env
+.git/

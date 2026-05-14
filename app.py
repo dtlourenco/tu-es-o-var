@@ -319,6 +319,10 @@ def download_url():
         'overwrites': True,
         'max_filesize': MAX_VIDEO_MB * 1024 * 1024,
     }
+    # Use cookies if available (needed for YouTube)
+    cpath = _cookies_path(sid)
+    if os.path.isfile(cpath):
+        ydl_opts['cookiefile'] = cpath
 
     display_name = ''
     try:
@@ -340,7 +344,18 @@ def download_url():
                     files.sort(reverse=True)
                     path = files[0][1]
     except Exception as e:
-        return _resp({'error': f'Falha no download: {str(e)[:200]}'}, sid), 500
+        msg = str(e)
+        if 'Unsupported URL' in msg:
+            return _resp({
+                'error': 'Site nao suportado. Tenta YouTube, Vimeo, '
+                         'Dailymotion, TVI, vsports.pt, ou faz upload direto.'
+            }, sid), 400
+        if 'Sign in' in msg or 'bot' in msg.lower():
+            return _resp({
+                'error': 'Este site requer autenticacao. Faz upload do '
+                         'cookies.txt (botao 🍪) ou usa upload direto.'
+            }, sid), 400
+        return _resp({'error': f'Falha no download: {msg[:200]}'}, sid), 500
 
     if not path or not os.path.exists(path):
         return _resp({'error': 'Ficheiro nao encontrado apos download'}, sid), 500
@@ -393,11 +408,7 @@ def load_video():
             return _resp({'error': 'Ficheiro vazio'}, sid), 400
     elif request.is_json and 'name' in request.json:
         fname = request.json['name']
-        # Support both root and session-local files
-        if '/' in fname:
-            path = os.path.join(INPUT_DIR, fname)
-        else:
-            path = os.path.join(INPUT_DIR, fname)
+        path = os.path.normpath(os.path.join(INPUT_DIR, fname))
     else:
         return _resp({'error': 'Nenhum video especificado'}, sid), 400
 
@@ -532,6 +543,31 @@ def action():
         cv2.imwrite(path, frame)
 
     return _resp(_state_dict(st), sid)
+
+
+# ── Cookies for YouTube ──────────────────────────────────────
+
+def _cookies_path(sid):
+    return os.path.join(_sdir(sid), 'cookies.txt')
+
+
+@app.route('/has_cookies')
+def has_cookies():
+    sid, _ = _get_sess()
+    ok = os.path.isfile(_cookies_path(sid))
+    return _resp({'ok': ok}, sid)
+
+
+@app.route('/upload_cookies', methods=['POST'])
+def upload_cookies():
+    sid, _ = _get_sess()
+    if 'file' not in request.files:
+        return _resp({'error': 'Sem ficheiro'}, sid), 400
+    f = request.files['file']
+    sd = _sdir(sid)
+    os.makedirs(sd, exist_ok=True)
+    f.save(_cookies_path(sid))
+    return _resp({'ok': True}, sid)
 
 
 if __name__ == '__main__':
