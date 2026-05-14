@@ -1,5 +1,10 @@
-app = 'app-delicate-wave-273'
-primary_region = 'mad'
+# fly.toml app configuration file generated for tu-es-o-var on 2026-05-14T00:51:22Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'tu-es-o-var'
+primary_region = 'cdg'
 
 [build]
 
@@ -14,3 +19,4 @@ primary_region = 'mad'
   memory = '512mb'
   cpu_kind = 'shared'
   cpus = 1
+  memory_mb = 512
