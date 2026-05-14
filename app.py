@@ -350,11 +350,6 @@ def download_url():
                 'error': 'Site nao suportado. Tenta YouTube, Vimeo, '
                          'Dailymotion, TVI, vsports.pt, ou faz upload direto.'
             }, sid), 400
-        if 'Sign in' in msg or 'bot' in msg.lower():
-            return _resp({
-                'error': 'Este site requer autenticacao. Faz upload do '
-                         'cookies.txt (botao 🍪) ou usa upload direto.'
-            }, sid), 400
         return _resp({'error': f'Falha no download: {msg[:200]}'}, sid), 500
 
     if not path or not os.path.exists(path):
