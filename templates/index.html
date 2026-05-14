@@ -589,6 +589,24 @@ async function downloadUrl() {
   const url = input.value.trim();
   if (!url) { input.focus(); return; }
 
+  // YouTube cookies warning
+  if (/youtu\.?be/i.test(url)) {
+    const hasCookies = await fetch('/has_cookies').then(r => r.json());
+    if (!hasCookies.ok) {
+      const tryAnyway = confirm(
+        '⚠️ O YouTube bloqueia downloads em servidores cloud.\n\n' +
+        'Opção 1 — Cookies:\n' +
+        '• Instala "Get cookies.txt LOCALLY" no Chrome\n' +
+        '• Vai a youtube.com (com login)\n' +
+        '• Exporta cookies → upload com 🍪\n\n' +
+        'Opção 2 — Upload direto:\n' +
+        '• Vai a cobalt.tools, cola o link, descarrega o MP4\n' +
+        '• Faz upload na app com 📁\n\n' +
+        'Tentar na mesma sem cookies?');
+      if (!tryAnyway) return;
+    }
+  }
+
   const btn = document.getElementById('btnDownload');
   const status = document.getElementById('dlStatus');
   btn.disabled = true;
