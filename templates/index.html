@@ -848,8 +848,11 @@ function drawOverlay() {
 
 // ── Frame navigation ─────────────────────────
 function moveFrame(delta) {
+  console.log('moveFrame', delta, 'loaded:', S.loaded, 'cur:', S.current_frame);
   if (!S.loaded) return;
-  const idx = Math.max(0, Math.min(S.n_frames - 1, S.current_frame + delta));
+  const cur = parseInt(S.current_frame) || 0;
+  const idx = Math.max(0, Math.min(S.n_frames - 1, cur + delta));
+  if (idx === cur) return;
   doAction('set_frame', {idx});
 }
 
