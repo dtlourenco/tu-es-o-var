@@ -1,6 +1,37 @@
 import cv2
 
 
+class LazyVideo:
+    """Read frames on demand instead of loading all into RAM."""
+
+    def __init__(self, path):
+        self.path = path
+        cap = cv2.VideoCapture(path)
+        if not cap.isOpened():
+            raise IOError(f"Cannot open {path}")
+        self.n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        cap.release()
+        self._cache_idx = -1
+        self._cache_frame = None
+        print(f"  [LazyVideo] {path}: {self.n} frames")
+
+    def __len__(self):
+        return self.n
+
+    def __getitem__(self, idx):
+        if idx == self._cache_idx and self._cache_frame is not None:
+            return self._cache_frame
+        cap = cv2.VideoCapture(self.path)
+        cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+        ret, frame = cap.read()
+        cap.release()
+        if not ret:
+            raise IndexError(f"Frame {idx} not readable")
+        self._cache_idx = idx
+        self._cache_frame = frame
+        return frame
+
+
 def read_video(video_path):
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():

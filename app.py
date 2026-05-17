@@ -23,7 +23,7 @@ from offside_tool import (
     draw_perspective_line, draw_dashed_line, _draw_extended_line,
     MAGENTA, CYAN, YELLOW, WHITE, BLACK,
 )
-from utils import read_video
+from utils import read_video, LazyVideo
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB
@@ -78,11 +78,27 @@ def _get_sess():
         if os.path.isdir(d):
             shutil.rmtree(d, ignore_errors=True)
         _sessions.pop(oldest, None)
-    sid = uuid.uuid4().hex[:10]
+    if not sid:
+        sid = uuid.uuid4().hex[:10]
     _sessions[sid] = {'state': None, 'video_path': None,
                       'last_access': time.time()}
     os.makedirs(_sdir(sid), exist_ok=True)
+    # Try to auto-recover: reload video from cookie hint
+    vp = request.cookies.get('vp')
+    if vp and os.path.isfile(vp):
+        _try_reload(sid, vp)
     return sid, _sessions[sid]
+
+
+def _try_reload(sid, video_path):
+    """Try to reload a video into the session (recovery after restart)."""
+    try:
+        lv = LazyVideo(video_path)
+        _sessions[sid]['state'] = State(lv)
+        _sessions[sid]['video_path'] = video_path
+        print(f"  [recover] {sid} reloaded {video_path} ({lv.n} frames)")
+    except Exception as e:
+        print(f"  [recover] failed: {e}")
 
 
 def _set_cookie(resp, sid):
@@ -377,15 +393,19 @@ def download_url():
 
     _cleanup_sdir(sid, keep=path)
 
-    frames = read_video(path)
-    if not frames:
-        return _resp({'error': 'Falha ao carregar video depois do download'}, sid), 500
+    try:
+        lv = LazyVideo(path)
+    except Exception as e:
+        return _resp({'error': f'Falha ao carregar video: {e}'}, sid), 500
 
-    sess['state'] = State(frames)
+    sess['state'] = State(lv)
     sess['video_path'] = path
     result = _state_dict(sess['state'])
     result['filename'] = display_name or os.path.basename(path)
-    return _resp(result, sid)
+    r = _resp(result, sid)
+    r.set_cookie('vp', path, max_age=SESSION_TIMEOUT,
+                 httponly=True, samesite='Lax', secure=bool(IS_PROD))
+    return r
 
 
 @app.route('/load', methods=['POST'])
@@ -416,13 +436,18 @@ def load_video():
 
     _cleanup_sdir(sid, keep=path)
 
-    frames = read_video(path)
-    if not frames:
-        return _resp({'error': 'Falha ao carregar video'}, sid), 500
+    try:
+        lv = LazyVideo(path)
+    except Exception as e:
+        return _resp({'error': f'Falha ao carregar video: {e}'}, sid), 500
 
-    sess['state'] = State(frames)
+    sess['state'] = State(lv)
     sess['video_path'] = path
-    return _resp(_state_dict(sess['state']), sid)
+    result = _state_dict(sess['state'])
+    r = _resp(result, sid)
+    r.set_cookie('vp', path, max_age=SESSION_TIMEOUT,
+                 httponly=True, samesite='Lax', secure=bool(IS_PROD))
+    return r
 
 
 @app.route('/frame')
@@ -450,6 +475,7 @@ def action():
     sid, sess = _get_sess()
     st = sess['state']
     if st is None:
+        print(f"  [action] sid={sid} state=None sessions={list(_sessions.keys())}")
         return _resp({'error': 'Nenhum video carregado'}, sid), 400
 
     data = request.json
