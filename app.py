@@ -33,6 +33,7 @@ OUTPUT_DIR = 'output_videos'
 MAX_VIDEO_MB = 100
 SESSION_TIMEOUT = 30 * 60  # 30 min
 MAX_SESSIONS = 20
+IS_PROD = os.environ.get('RENDER') or os.environ.get('FLY_APP_NAME') or os.environ.get('ONRENDER')
 
 os.makedirs(INPUT_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -84,18 +85,23 @@ def _get_sess():
     return sid, _sessions[sid]
 
 
+def _set_cookie(resp, sid):
+    """Set session cookie on response."""
+    resp.set_cookie('sid', sid, max_age=SESSION_TIMEOUT,
+                    httponly=True, samesite='Lax',
+                    secure=bool(IS_PROD))
+    return resp
+
+
 def _resp(data, sid):
     """JSON response with session cookie."""
     r = make_response(jsonify(data))
-    r.set_cookie('sid', sid, max_age=SESSION_TIMEOUT,
-                 httponly=True, samesite='Lax')
-    return r
+    return _set_cookie(r, sid)
 
 
 def _resp_bytes(raw, mime, sid):
     r = make_response(Response(raw, mimetype=mime))
-    r.set_cookie('sid', sid, max_age=SESSION_TIMEOUT,
-                 httponly=True, samesite='Lax')
+    return _set_cookie(r, sid)
     return r
 
 
@@ -262,9 +268,7 @@ def _state_dict(st):
 def index():
     sid, _ = _get_sess()
     r = make_response(render_template('index.html'))
-    r.set_cookie('sid', sid, max_age=SESSION_TIMEOUT,
-                 httponly=True, samesite='Lax')
-    return r
+    return _set_cookie(r, sid)
 
 
 @app.route('/videos')
