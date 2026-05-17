@@ -1,10 +1,7 @@
 __pycache__/
 *.pyc
 input_videos/
+!input_videos/demo_offside.mp4
 output_videos/
 models/
-*.mp4
-*.avi
-*.mkv
-*.webm
 .env
